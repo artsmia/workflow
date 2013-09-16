@@ -1,0 +1,94 @@
+#workflow-control-div input{
+	margin-right:10px;
+}
+#workflow-control-div .destructive input{
+	background: #444444;
+	background: -moz-linear-gradient(top,  #444444 0%, #000000 100%);
+	background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#444444), color-stop(100%,#000000));
+	background: -webkit-linear-gradient(top,  #444444 0%,#000000 100%);
+	background: -o-linear-gradient(top,  #444444 0%,#000000 100%);
+	background: -ms-linear-gradient(top,  #444444 0%,#000000 100%);
+	background: linear-gradient(to bottom,  #444444 0%,#000000 100%);	
+	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#444444', endColorstr='#000000',GradientType=0 );
+	color:#fff;
+	text-shadow:none;
+}
+#workflow-control-div .destructive input:hover{
+	background: #e00000;
+	background: -moz-linear-gradient(top,  #e00000 0%, #9b0000 100%);
+	background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#e00000), color-stop(100%,#9b0000));
+	background: -webkit-linear-gradient(top,  #e00000 0%,#9b0000 100%);
+	background: -o-linear-gradient(top,  #e00000 0%,#9b0000 100%);
+	background: -ms-linear-gradient(top,  #e00000 0%,#9b0000 100%);
+	background: linear-gradient(to bottom,  #e00000 0%,#9b0000 100%);
+	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#e00000', endColorstr='#9b0000',GradientType=0 );
+}
+.mia_wf_meta_div{
+	padding:20px 0px 0px 0px;
+}
+.mia_wf_meta_div:first-child{
+	padding-top:10px;
+}
+.mia_wf_meta_div:last-child{
+	border-bottom:0px;
+	padding-bottom:15px;
+}
+#workflow-control-div h2{
+	line-height:1.3em;
+	margin:0px;
+}
+#workflow-control-div h4{
+	font-size:1.2em;
+	margin:0px;
+}
+.mia_wf_label{
+	margin:0px 0px 5px 0px;
+	text-transform:uppercase;
+	font-size:0.9em;
+	font-weight:bold;
+	color:#999;
+}
+.mia_wf_helper{
+	margin-top:2px;
+	font-size:0.9em;
+	color:#666;
+}
+#mia_wf_request_merge_info{
+	display:none;
+}
+
+/* COMMENTS */
+
+#workflow-notifications-div .comment{
+	padding:15px;
+	margin:15px 0px 0px 0px;
+	border:1px solid #ccc;
+}
+#workflow-notifications-div .comment.merge_request{
+	border-left:7px solid #21759b;
+	padding-left:8px;
+}
+#workflow-notifications-div .avatar-small{
+	width:50px;
+	height:50px;
+}
+#workflow-notifications-div .comment .comment_content{
+	margin-left:60px;
+}
+#workflow-notifications-div .comment p{
+	margin:0px;
+}
+#workflow-notifications-div .comment p.name{
+	font-weight:bold;
+	font-size:1.2em;
+	padding-bottom:5px;
+	border-bottom:1px solid #ddd;
+	margin-bottom:5px;
+}
+#workflow-notifications-div .name span{
+	font-weight:normal;
+}
+#workflow-notifications-div .date{
+	font-size:0.8em;
+	text-transform:uppercase;
+}
