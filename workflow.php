@@ -748,34 +748,38 @@ function mia_wf_editor_dashboard_widget_content() {
 } 
 function mia_wf_author_dashboard_widget_content() {
 	$my_revs = mia_wf_get_revs_by_author(get_current_user_id());
+	if(!$my_revs){
+		echo "No current revisions.";
+	} else {
 	?>
-   <table style="width:100%;">
-   	<tr>
-      	<th>Status</th>
-      	<th>Title</th>
-         <th>Last Modified</th>
-         <th>Edit Revision</th>
-      </tr>
-   <?php
-	foreach($my_revs as $revision){
-		switch($revision->revision_status){
-			case 'in_progress':
-				$status = 'In Progress';
-				break;
-			case 'pending_merge':
-				$status = 'Merge Requested';
-				break;
-			default:
-				$status = 'Unknown';
+      <table style="width:100%;">
+         <tr>
+            <th>Status</th>
+            <th>Title</th>
+            <th>Last Modified</th>
+            <th>Edit</th>
+         </tr>
+  		<?php
+		foreach($my_revs as $revision){
+			switch($revision->revision_status){
+				case 'in_progress':
+					$status = 'In Progress';
+					break;
+				case 'pending_merge':
+					$status = 'Merge Requested';
+					break;
+				default:
+					$status = 'Unknown';
+			}
+			echo "<tr>";
+			echo "<td>" . $status . "</td>";
+			echo "<td>" . $revision->title . "</td>";
+			echo "<td>" . $revision->modified_date . "</td>";
+			echo "<td><a href='" . get_edit_post_link($revision->revision_id) . "'>Edit</a></td>";
+			echo "</tr>";
 		}
-		echo "<tr>";
-		echo "<td>" . $status . "</td>";
-		echo "<td>" . $revision->title . "</td>";
-		echo "<td>" . $revision->modified_date . "</td>";
-		echo "<td><a href='" . get_edit_post_link($revision->revision_id) . "'>Edit</a></td>";
-		echo "</tr>";
+		echo "</table>";
 	}
-	echo "</table>";
 }
 
 
