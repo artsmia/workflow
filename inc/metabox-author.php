@@ -1,6 +1,7 @@
 <?php
 
 function mia_wf_author_metabox_content($post){
+	
 	$parent = mia_wf_get_original_post($post->ID);
 	$post_type = get_post_type_object($parent->post_type);
 	$post_type_label = strtolower($post_type->labels->singular_name);

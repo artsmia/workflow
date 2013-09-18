@@ -7,6 +7,7 @@ Author: Minneapolis Institute of Arts
 */
 
 date_default_timezone_set('America/Chicago');
+$MIA_WF_ORIGIN = '';
 
 /*
  *
@@ -14,6 +15,7 @@ date_default_timezone_set('America/Chicago');
  * This will be haphazard for a while.
  *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+include(__DIR__ . "/inc/utils.php");
 include(__DIR__ . "/inc/metabox-author.php");
 include(__DIR__ . "/inc/metabox-other-author.php");
 include(__DIR__ . "/inc/metabox-notifications.php");
@@ -54,8 +56,10 @@ function mia_wf_setup(){
 
 	// Add manage_workflow capability
    $editor = get_role( 'editor' );
+	$editor->add_cap( 'bypass_workflow' );
    $editor->add_cap( 'manage_workflow' );
 	$admin = get_role( 'administrator' );
+	$admin->add_cap( 'bypass_workflow' );
 	$admin->add_cap( 'manage_workflow' );
 }
 
@@ -81,8 +85,10 @@ function mia_wf_strike(){
 	
 	// Remove manage_workflow capability
 	$editor = get_role( 'editor' );
+	$editor->remove_cap( 'bypass_workflow' );
 	$editor->remove_cap( 'manage_workflow' );
 	$admin = get_role( 'administrator' );
+	$admin->remove_cap( 'bypass_workflow' );
 	$admin->remove_cap( 'manage_workflow' );
 }
 
@@ -104,10 +110,26 @@ function enqueue_mia_wf_route_user(){
 		global $pagenow;
 		global $post;
 		$screen = get_current_screen();
-		if($pagenow == 'post.php' && $screen->id != 'attachment'){
-			
-			// Check for capability
-			if($post->post_status != 'pending' && !current_user_can('manage_workflow')){
+		
+		// Let's work out all of our possible contexts first, so we can
+		// flip through our routes with a nice switch statement.
+		$is_new_post = $pagenow == 'post-new.php' ? true : false;
+		$is_existing_post = $pagenow == 'post.php' ? true : false;
+		$is_attachment = $screen->id == 'attachment' ? true : false;
+		$is_revision = $post->post_status == 'pending' ? true : false;
+		
+		if($is_existing_post && !$is_attachment && !$is_revision && !current_user_can('manage_workflow') && !current_user_can('bypass_workflow')){
+			$route = 'revision';
+		}
+		if($is_new_post && !$is_attachment && !current_user_can('manage_workflow') && !current_user_can('bypass_workflow')){
+			$route == 'draft';
+		}
+
+		switch($route){
+			case 'revision' : 	
+				// We're editing an existing post, which means we need 
+				// to redirect to a revision. We check for one and 
+				// create it if it does not exist.
 				
 				// Check for revision
 				global $wpdb;
@@ -169,7 +191,9 @@ function enqueue_mia_wf_route_user(){
 						}
 						wp_set_object_terms($revision_id, $type_ids, 'ev_type');
 					}
+					
 					// Copy group connections
+					// Events and Exhibition connections
 					if((get_post_type($post_id) == 'event') || (get_post_type($post_id) == 'exhibition')){
 						$p2p_table = $wpdb->prefix . 'p2p';
 						$connections = $wpdb->get_results(
@@ -185,6 +209,7 @@ function enqueue_mia_wf_route_user(){
 							);
 						}
 					}
+					// Group connections
 					if(get_post_type($post_id) == 'group'){
 						$p2p_table = $wpdb->prefix . 'p2p';
 						$connections = $wpdb->get_results(
@@ -201,15 +226,24 @@ function enqueue_mia_wf_route_user(){
 						}
 					}	
 										
-					// Add record to mia_wf_relationships table
+					// Add record to mia_wf_relationships table - this now
+					// occurs later in the process
+					/*
 					$wpdb->query($wpdb->prepare("INSERT INTO $mia_wf_relationships (post_id, user_id, revision_id, revision_status) VALUES (%d, %d, %d, 'in_progress')", $post_id, $user_id, $revision_id));
+					*/
 				}
 				
 				// Redirect to revision
 				$revision_edit_url = get_edit_post_link($revision_id, '');
 				wp_redirect($revision_edit_url);
-				exit;	
-			}
+				exit;
+				
+			case 'draft':
+				// The author wants to make a new page.
+				
+				break;
+			default:
+				break;
 		}
 	}
 }
@@ -222,24 +256,27 @@ function enqueue_mia_wf_route_user(){
  * and add custom metaboxes to manage revision workflow
  *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
- 
+
 add_action('add_meta_boxes', 'mia_wf_metaboxes');
 function mia_wf_metaboxes(){
 	global $post;
-	if($post->post_status == 'pending'){
+	global $pagenow;
+	if($post->post_status == 'pending' || $post->post_status == 'auto-draft'){
+		// Remove publishing divs
 		remove_meta_box('submitdiv', $post->post_type, 'side');
 		remove_meta_box('pageparentdiv', $post->post_type, 'side');
+		// Show appropriate boxes for capability
 		if(current_user_can('manage_workflow')){
 			add_meta_box('workflow-control-div', 'Revision Options', 'mia_wf_editor_metabox_content', $post->post_type, 'side', 'high');
-			add_meta_box('workflow-notifications-div', 'Revision Comments', 'mia_wf_notifications_metabox_content', $post->post_type, 'side', 'high');
 		} else {
 			if(mia_wf_is_revision_author($post)){
 				add_meta_box('workflow-control-div', 'Revision Options', 'mia_wf_author_metabox_content', $post->post_type, 'side', 'high');
-				add_meta_box('workflow-notifications-div', 'Revision Comments', 'mia_wf_notifications_metabox_content', $post->post_type, 'side', 'high');
 			} else {
 				add_meta_box('workflow-control-div', 'Revision Options', 'mia_wf_guest_author_metabox_content', $post->post_type, 'side', 'high');
 			}
 		}
+		// Everyone sees the comments
+		add_meta_box('workflow-notifications-div', 'Revision Comments', 'mia_wf_notifications_metabox_content', $post->post_type, 'side', 'high');
 	} else if (mia_wf_count_active_revisions($post->ID) && current_user_can('manage_workflow')){
 		add_meta_box('workflow-control-div', 'Revisions', 'mia_wf_post_overview_metabox_content', $post->post_type, 'side', 'high');
 	}
@@ -529,60 +566,8 @@ function mia_wf_block_publish($post){
 }
 
 
-/*
- *
- * MIA_WF_GET_REVISION_STATUS (UTILITY)
- * Returns current revision status slug
- *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
- 
-function mia_wf_get_revision_status($revision_id){
-	global $wpdb;
-	$mia_wf_relationships = $wpdb->prefix . "mia_wf_relationships";
-	$status = $wpdb->get_var(
-		$wpdb->prepare(
-			"SELECT revision_status FROM $mia_wf_relationships WHERE revision_id = %d", $revision_id
-		)
-	);
-	return $status;
-}
-
-/*
- *
- * MIA_WF_SET_REVISION_STATUS (UTILITY)
- * Update status in Relationships table
- *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-
-function mia_wf_set_revision_status($revision_id, $status){
-	global $wpdb;
-	$mia_wf_relationships = $wpdb->prefix . "mia_wf_relationships";
-	$wpdb->query(
-		$wpdb->prepare(
-			"UPDATE $mia_wf_relationships SET revision_status = %s WHERE revision_id = %d", $status, $revision_id
-		)
-	);
-}
 
 
-/*
- *
- * MIA_WF_ADD_NOTIFICATION (UTILITY)
- * Add an entry to the Notifications table.
- * 
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-
-function mia_wf_add_notification($revision_id, $type, $message){
-	$user_id = get_current_user_id();
-	global $wpdb;
-	$mia_wf_notifications = $wpdb->prefix . "mia_wf_notifications";
-	$date = date('Y-m-d H:i:s');
-	$wpdb->query(
-		$wpdb->prepare(
-			"INSERT INTO $mia_wf_notifications (user_id, revision_id, date_posted, type, message) VALUES (%d, %d, %s, %s, %s)", $user_id, $revision_id, $date, $type, $message
-		)
-	);
-}
 
 
 /*
@@ -600,107 +585,6 @@ function mia_wf_save_message($post_id){
 }
 
 
-/*
- *
- * MIA_WF_GET_ORIGINAL_POST (UTILITY)
- * Given the post ID of a revision, retrieves the post object
- * of the post it's based on.
- *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-function mia_wf_get_original_post($revision_id){
-	global $wpdb;
-	$mia_wf_relationships = $wpdb->prefix . "mia_wf_relationships";
-	$orig_id = $wpdb->get_var(
-		$wpdb->prepare(
-			"SELECT post_id FROM $mia_wf_relationships WHERE revision_id = %d", $revision_id
-		)
-	);
-	$orig_post = get_post($orig_id);
-	return $orig_post;
-}
-
-/*
- *
- * MIA_WF_GET_ACTIVE_SIBLING_REVISIONS
- * Given the ID of a revision, retrieves a numerically
- * indexed array of other ACTIVE revisions (each an object 
- * with properties revision_id, user_id, revision_status, 
- * user_name, created_date, and modified_date).
- *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-function mia_wf_get_active_sibling_revisions($revision_id){
-	global $wpdb;
-	$mia_wf_relationships = $wpdb->prefix . "mia_wf_relationships";
-	$siblings = $wpdb->get_results(
-		$wpdb->prepare(
-			"SELECT revision_id, user_id, revision_status FROM $mia_wf_relationships WHERE revision_id != %d AND (revision_status = 'in_progress' OR revision_status = 'pending_merge') AND post_id IN (SELECT * FROM (SELECT post_id FROM $mia_wf_relationships WHERE revision_id = %d) Alias)", $revision_id, $revision_id					
-		), 'OBJECT'
-	);
-	foreach($siblings as $key=>$sibling){
-		global $post;
-		$save_post = $post;
-		$post = get_post($sibling->revision_id);
-		setup_postdata($post);
-		$siblings[$key]->user_name = get_the_author();
-		$siblings[$key]->created_date = get_the_date('n/j/Y');
-		$siblings[$key]->modified_date = get_the_modified_date('n/j/Y');
-		$post = $save_post;
-		setup_postdata($post);
-	}
-	return $siblings;
-}
-
-
-/*
- *
- * MIA_WF_COUNT_ACTIVE_REVISIONS
- * Given the post ID of a post, returns the number of
- * revisions existing for it in the relationships table.
- *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-
-function mia_wf_count_active_revisions($post_id){
-	global $wpdb;
-	$mia_wf_relationships = $wpdb->prefix . "mia_wf_relationships";
-	$revisions = $wpdb->get_var(
-		$wpdb->prepare(
-			"SELECT COUNT(*) FROM $mia_wf_relationships WHERE post_id = %d AND (revision_status = 'in_progress' OR revision_status = 'pending_merge')", $post_id
-		)
-	);
-	return $revisions;
-}
-
-
-/*
- *
- * MIA_WF_GET_ACTIVE_REVISIONS
- * Given the ID of a (parent) post, retrieves a numerically
- * indexed array of its active revisions (each an object with
- * properties revision_id, user_id, revision_status, user_name,
- * created_date, and modified_date).
- *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-function mia_wf_get_active_revisions($post_id){
-	global $wpdb;
-	$mia_wf_relationships = $wpdb->prefix . "mia_wf_relationships";
-	$revisions = $wpdb->get_results(
-		$wpdb->prepare(
-			"SELECT revision_id, user_id, revision_status FROM $mia_wf_relationships WHERE post_id = %d AND (revision_status = 'in_progress' OR revision_status = 'pending_merge')", $post_id
-		), 'OBJECT'
-	);
-	foreach($revisions as $key=>$revision){
-		global $post;
-		$save_post = $post;
-		$post = get_post($revision->revision_id);
-		setup_postdata($post);
-		$revisions[$key]->user_name = get_the_author();
-		$revisions[$key]->created_date = get_the_date('n/j/Y');
-		$revisions[$key]->modified_date = get_the_modified_date('n/j/Y');
-		$post = $save_post;
-		setup_postdata($post);
-	}
-	return $revisions;
-}
 
 
 /*
@@ -783,77 +667,7 @@ function mia_wf_author_dashboard_widget_content() {
 }
 
 
-/*
- *
- * MIA_WF_GET_READY_REVISIONS
- * Fetch all ready revisions for the editor dashboard widget.
- *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-function mia_wf_get_ready_revisions(){
-	global $wpdb;
-	$mia_wf_relationships = $wpdb->prefix . "mia_wf_relationships";
-	$mia_wf_notifications = $wpdb->prefix . "mia_wf_notifications";
-	$ready_revs = $wpdb->get_results(
-			"SELECT * FROM ( SELECT b.id, a.post_id, a.user_id, a.revision_id, b.message, b.type FROM $mia_wf_relationships AS a JOIN $mia_wf_notifications AS b ON a.revision_id = b.revision_id WHERE a.revision_status = 'pending_merge' AND b.type = 'merge_request' ORDER BY b.id DESC) AS c GROUP BY type", 'OBJECT'
-	);
-	foreach($ready_revs as $key=>$revision){
-		global $post;
-		$post = get_post($revision->revision_id);
-		$save_post = $post;
-		setup_postdata($post);
-		$ready_revs[$key]->user_name = get_the_author();
-		$ready_revs[$key]->created_date = get_the_date('n/j/Y');
-		$ready_revs[$key]->modified_date = get_the_modified_date('n/j/Y');
-		$ready_revs[$key]->title = get_the_title();
-		$post = $save_post;
-		setup_postdata($post);
-	}
-	return $ready_revs;
-}
 
-
-/*
- *
- * MIA_WF_GET_REVS_BY_AUTHOR
- * Fetch all revisions for a particular author
- *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-
-function mia_wf_get_revs_by_author($user_id){
-	global $wpdb;
-	$mia_wf_relationships = $wpdb->prefix . "mia_wf_relationships";
-	$my_revs = $wpdb->get_results(
-		$wpdb->prepare(
-			"SELECT post_id, revision_id, revision_status FROM $mia_wf_relationships WHERE user_id = %d AND (revision_status = 'pending_merge' OR revision_status = 'in_progress')", $user_id
-		), 'OBJECT'
-	);
-	foreach($my_revs as $key=>$revision){
-		global $post;
-		$post = get_post($revision->revision_id);
-		$save_post = $post;
-		setup_postdata($post);
-		$my_revs[$key]->created_date = get_the_date('n/j/Y');
-		$my_revs[$key]->modified_date = get_the_modified_date('n/j/Y');
-		$my_revs[$key]->title = get_the_title();
-		$post = $save_post;
-		setup_postdata($post);
-	}
-	return $my_revs;
-}
-
-/*
- *
- * MIA_WF_IS_REVISION_AUTHOR
- * Returns true if the current user is the revision author,
- * otherwise returns false.
- *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-
-function mia_wf_is_revision_author($post){
-	$user_id = get_current_user_id();
-	$author_id = $post->post_author;
-	return $user_id == $author_id;
-}
 
 // DON'T SHOW PENDING IN LIST
 
